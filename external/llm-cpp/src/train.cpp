@@ -619,7 +619,7 @@ void train(
   // checkpoint_dir. Relaunch after a crash and it picks up where it stopped.
   int64_t start_step = 0;
   if (ckpt_mgr && cfg.resume) {
-    auto tag = ckpt_mgr->latest();
+    auto tag = ckpt_mgr->latest_complete(ddp ? ddp->world_size() : 1);
     if (tag) {
       auto meta = ckpt_mgr->load(*tag, *model, *optimizer,
                                  rank, ddp ? ddp->world_size() : 1);

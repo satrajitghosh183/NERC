@@ -330,11 +330,42 @@ std::optional<std::string> CheckpointManager::latest() const {
   return best;
 }
 
+std::optional<std::string> CheckpointManager::latest_complete(int world_size) const {
+  // Order candidate tags by numeric step, descending.
+  std::vector<std::pair<int64_t, std::string>> by_step;
+  for (const auto& tag : list_checkpoints()) {
+    auto pos = tag.find("step_");
+    if (pos == std::string::npos) continue;
+    try { by_step.emplace_back(std::stoll(tag.substr(pos + 5)), tag); } catch (...) {}
+  }
+  std::sort(by_step.begin(), by_step.end(),
+            [](const auto& a, const auto& b) { return a.first > b.first; });
+  // Return the newest tag whose every rank shard has a readable metadata.json
+  // (written LAST in save(), so its presence implies the model shards exist).
+  for (const auto& kv : by_step) {
+    const std::string& tag = kv.second;
+    bool complete = true;
+    for (int r = 0; r < world_size; ++r) {
+      try { (void)read_metadata(shard_dir(tag, r)); }
+      catch (...) { complete = false; break; }
+    }
+    if (complete) return tag;
+    std::cout << "RESUME: skipping incomplete checkpoint '" << tag << "'\n";
+  }
+  return std::nullopt;
+}
+
 void CheckpointManager::prune(int keep_n) {
   auto tags = list_checkpoints();
   if (static_cast<int>(tags.size()) <= keep_n) return;
 
-  // Remove oldest (tags are sorted)
+  // numeric step (robust-resume fix): sort by step number, not lexicographically,
+  // so step_8000 is older than step_12000 (lexical order gets this wrong).
+  std::sort(tags.begin(), tags.end(), [](const std::string& a, const std::string& b){
+    auto num=[](const std::string& t){ auto p=t.find("step_"); return p==std::string::npos?0LL:std::stoll(t.substr(p+5)); };
+    return num(a) < num(b);
+  });
+
   int to_remove = static_cast<int>(tags.size()) - keep_n;
   for (int i = 0; i < to_remove; ++i) {
     std::string dir = base_path_ + "/" + tags[i];

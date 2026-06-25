@@ -83,6 +83,11 @@ class CheckpointManager {
   /// Find the latest checkpoint tag by step number
   std::optional<std::string> latest() const;
 
+  /// Latest checkpoint whose shards are COMPLETE for all ranks (every
+  /// rank_<R>/metadata.json exists). Skips partially-written checkpoints
+  /// so resume never loads a torn shard. Falls back to older complete ones.
+  std::optional<std::string> latest_complete(int world_size) const;
+
   /// Keep only the N most recent checkpoints
   void prune(int keep_n);
 
