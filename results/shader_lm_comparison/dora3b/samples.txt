@@ -1,0 +1,201 @@
+### // Shader: blue fire  (compiles=False)
+// I made a shader for my 3d game engine and wanted to share it.
+// tags: fire, liquid, water, rainbow, reflection
+/*
+I made this in Unreal Engine
+
+https://www.youtube.com/watch?v=Jn4tK5b8y7o&feature=youtu.be&t=10m2s
+
+*/
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    // Normalized pixel coordinates (from 0 to 1)
+    vec2 uv = fragCoord/iResolution.xy;
+    
+    float radius = iTime*3.0+sin(iTime/2.0)*5.;
+    float offset = sin(uv.y*iTime);
+    
+    float r = clamp(radius-length(vec2(sin(iTime),cos(iTime))*offset)-uv.x, 0., 1.);
+    
+    
+    float angle = atan((fragCoord.y-iResolution.y*.5)/(iResolution.x*.6));
+	vec3 col = vec3(r,radius+r*r,sin(angle+iTime)+r*r);
+
+	col *=
+
+### // Shader: ocean waves  (compiles=True)
+// Simple wavey thing.
+// tags: 2d, water, waves
+#define PI 3.14159
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    float aspect = iResolution.x / iResolution.y;
+    
+    // Normalized pixel coordinates (from -1 to 1)
+    vec2 uv = fragCoord/iResolution.xy * 2.0 - 1.0; 
+	uv *= mat2(cos(iTime),sin(iTime),
+               -sin(iTime),cos(iTime));
+    uv.x *= aspect;
+
+    // Time varying pixel color
+	vec3 col = .5 + .5*cos(iTime+uv.xyx+vec3(0,2,4));
+
+	fragColor = vec4(col,1.0);
+}
+
+### // Shader: red plasma  (compiles=False)
+// red plasma. https://www.shadertoy.com/view/4sS3Wc
+// tags: plasma, rainbow
+#define time iTime
+
+float circle(vec2 uv, vec2 p,float r){
+    return smoothstep(r,r+0.01,length(uv-p));
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    
+	vec2 uv = (fragCoord.xy - 0.5 *iResolution.xy) / iResolution.y;
+    float t = time*1.;
+    
+    
+    //uv.x *= iResolution.x/iResolution.y; 
+    //uv*=sin(t);
+    vec3 col=vec3(.0,.0,.0);
+
+    
+   for(float i=-t;i<=t;i+=1./6.)
+    {
+    	float c=i*(t);
+        col += vec3(circle(uv+c,cos(c),0.75))+(cos(i*sin(sin(time))*time)*0.5+.5);   
+        
+    }
+	fragColor = vec4(col,1.0);
+
+
+### // Shader: starfield sky  (compiles=False)
+// simple, yet nice.  (i like this effect on my mac)
+// tags: procedural, stars, noise, field, sky, star
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    // Normalized pixel coordinates (from 0 to 1)
+    float t = iTime;
+    
+	vec2 uv = fragCoord.xy / iResolution.xy;
+    
+	float n1 = fract(sin(t*1567.38)*9483.35);
+	
+	uv.y += sin(n1*t)/t+sin(uv.x*iTime/2.);
+	
+	fragColor = vec4( .4 + 2.*n1*sin(t*uvec2(1.,-1.)+uv));
+}
+
+### // Shader: rainbow gradient  (compiles=False)
+// A simple shader with a cool looking rainbow gradient. Made using the technique from this tutorial http://www.youtube.com/watch?v=1wX3UvYmT4k
+// tags: 2d, gradient, animation
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+	vec2 uv = (fragCoord.xy - iResolution.xy * .5) / iResolution.y;
+    float t = sin(iTime);
+    
+    // calculate hue component of color space
+	float h = fract(t * 0.6 + abs(sin(uv.x)));
+	h += fract(t * 0.9 + abs(cos(uv.x))) * 0.3;
+    h += fract(t * 0.7 + abs(cos(uv.y))) * 0.1;
+
+    // convert hue to RGB values
+	vec3 rgb = clamp(abs(mod(h*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0,
+
+### // Shader: noise clouds  (compiles=False)
+// cloudy scene, made with random functions. I am still learning how to use shaders and 3d.
+// tags: raymarching, clouds
+float sdSphere( vec3 p, float s )
+{
+    return length(p)-s;
+}
+
+float sdBox( vec3 p, vec3 b )
+{
+	vec3 d = abs(p) - b;
+	return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
+}
+
+
+mat2 rot(float a)
+{ 
+	float c=cos(a), s=sin(a);
+	return mat2(c,-s,s,c); 
+} 
+
+vec4 fbm(vec3 x,float f){
+    vec4 n = vec4(sdSphere(x+vec3(-1.,-1.-f,f*1.),1.),sdSphere(x,y,x+z),x,z);
+    
+    for(int i=0; i<8;i++){
+        f+=.5;
+        vec3 r=mod(x*f,f)*f-.5*f;
+
+        
+        n += .5/fbM
+
+### // Shader: rotating tunnel  (compiles=False)
+// just a test, not very well done.
+// tags: 3d, raymarching, distancefield, tunnel, rotation
+#define PI acos(-1.)
+#define TAU (PI*2.)
+
+struct Sphere {
+    vec3 p;
+    float r;
+};
+
+float sphere(vec3 pos, Sphere s) { return length(pos-s.p)-s.r; }
+
+Sphere get_sphere(int id)
+{
+    if(id == 0) {
+        return Sphere(vec3(0.,-50.,0.),1.);
+    } else {
+        return Sphere(vec3(cos(iTime),sin(iTime)*cos(iTime+TAU/4.),
+                           sin(iTime)*sin(iTime+TAU/4.)),2.);
+    }
+}
+
+vec3 rotate(vec3 v, float angle, vec3 axis)
+{
+	vec3 u = normalize(axis);
+	float c = cos(angle); 
+	float s = sqrt(1.-c*c);
+	return mix(v*cos(angle)+cross(u,v), cross(u,v)*s + u*v*s+c*u*u*(1.-s), smooth
+
+### // Shader: water ripples  (compiles=False)
+// 2D
+// tags: 2d, ripple, water
+#define PI	3.14159265
+
+vec2 rotate(vec2 v, float a)
+{
+	return vec2(v.x*cos(a) - v.y*sin(a), v.x*sin(a) + v.y*cos(a));
+}
+
+float wave(float t, float c, float x, float y)
+{	
+    return smoothstep(c*c+0.005,c*x,t-y);
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+	vec2 uv = (fragCoord.xy / iResolution.xy)*2.;
+    
+    // move to center of screen 
+	uv -= vec2(iMouse.x/iResolution.x*2.,iMouse.y/iResolution.y*2.);
+	
+    if (iMouse.z > 0.)
+        uv += sin(iTime/2.)/8.;
+
+	float s = mod(uv.y * 7.+ iTime/1.,PI*2.);
+    float l = length(uv); 
+    
+	fragColor
+

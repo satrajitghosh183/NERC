@@ -1,0 +1,12 @@
+# Shader-LM comparison — from-scratch vs DoRA (compile@k)
+
+| Model | Approach | compile@1 | compiled/n |
+|---|---|---|---|
+| From-scratch 3B SLM | from-scratch | 0.00 | 0/8 |
+| DoRA Qwen-Coder-3B | DoRA 3B | 0.12 | 1/8 |
+| DoRA Qwen-Coder-32B | DoRA 32B | 0.25 | 2/8 |
+
+compile@1 = fraction of 8 prompts whose generated shader compiles with glslangValidator
+(the debugger-in-the-loop reward signal; OmniTrace enriches it with execution traces).
+
+Sample shaders per model: ~/pipeline/<name>_out/samples.txt
