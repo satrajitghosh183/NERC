@@ -156,7 +156,13 @@ void LocalFileSystem::mkdir(const std::string& path) {
 
 /// Recursive delete (file or whole subtree).
 void LocalFileSystem::remove(const std::string& path) {
-  fs::remove_all(path);
+  // Non-throwing: prune() runs on every rank, so two ranks can race to remove
+  // the same checkpoint dir. The throwing remove_all() would make the loser
+  // throw "No such file or directory" mid-recursion, killing that rank and
+  // deadlocking the survivor on the next NCCL collective. error_code tolerates
+  // already-gone / racily-vanishing paths.
+  std::error_code ec;
+  fs::remove_all(path, ec);
 }
 
 /// File size in bytes. Throws via std::filesystem on missing/non-regular.
