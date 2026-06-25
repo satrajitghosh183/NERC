@@ -356,6 +356,12 @@ int64_t sample_logits(torch::Tensor logits, double temperature,
   // (8 bytes) crosses D->H, vs the full [V] (~200 KB/token) the host path
   // below copies. Greedy (temperature 0, the race path) is deterministic and
   // identical to the host path; sampled output uses torch's CUDA generator.
+  //
+  // The model may run in BF16 (bf16-trained checkpoint); logits are then BF16.
+  // Both gpu_sample and the host data_ptr<float>() path assume FP32, so argmax
+  // ties at BF16 precision collapse greedy decoding to low-id (whitespace)
+  // tokens. Upcast once here so both paths sample correctly.
+  if (logits.scalar_type() != torch::kFloat32) logits = logits.to(torch::kFloat32);
   if (logits.is_cuda()) {
     (void)gen;
     return olmo_cpp::gpu_sample(logits, temperature, top_k, top_p,
