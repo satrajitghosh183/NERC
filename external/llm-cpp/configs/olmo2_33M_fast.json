@@ -1,0 +1,15 @@
+{
+  "d_model": 512,
+  "vocab_size": 50257,
+  "n_layers": 8,
+  "n_heads": 8,
+  "n_kv_heads": -1,
+  "head_dim": -1,
+  "rope_theta": 500000,
+  "layer_norm_eps": 1e-6,
+  "init_std": 0.02,
+  "use_qk_norm": true,
+  "use_head_qk_norm": false,
+  "hidden_size_multiple_of": 256,
+  "hidden_size_multiplier": 1.5
+}

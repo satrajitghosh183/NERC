@@ -1,0 +1,4 @@
+suite,name,metric,value,unit
+synth_compile_at_k,stub_generator,compile_at_1,0.5,frac
+synth_compile_at_k,stub_generator,compile_at_k,1,frac
+synth_compile_at_k,stub_generator,mean_attempts,1.5,count

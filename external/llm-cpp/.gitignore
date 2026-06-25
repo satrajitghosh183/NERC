@@ -1,0 +1,69 @@
+# Build
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# Data files (too large for git)
+data/*.npy
+data/*.bin
+data/*.tok
+
+# Checkpoints & model weights — NEVER commit (multi-GB).
+# NOTE: .gitignore has no inline comments — keep patterns on their own lines.
+checkpoints/
+*.pt
+*.ckpt
+*.pth
+*.safetensors
+*.gguf
+*.onnx
+# HF pytorch_model*.bin shards (data/*.bin already covered above)
+*.bin
+
+# Downloaded reference / comparison models (HF snapshots, ollama pulls)
+olmo-32b/
+models/
+hf_models/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Third-party deps fetched by CMake (keep cnpy tracked)
+third_party/*/
+!third_party/cnpy/
+
+# Benchmark outputs
+benchmark_results.json
+
+# Secrets / env files
+.env*
+!.env.alerts.example
+
+# Heartbeat files
+heartbeat_*.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+CLAUDE.md
+
+# Personal research plan — stays local, not tracked
+plan.md
+
+*.nsys-rep
+*.qdstrm
+*.sqlite
+*.nsys-rep.md
+*.qdstrm.md
+*.sqlite.md

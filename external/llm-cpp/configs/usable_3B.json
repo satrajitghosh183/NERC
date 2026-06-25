@@ -1,0 +1,20 @@
+{
+  "d_model": 3072,
+  "vocab_size": 50304,
+  "n_layers": 24,
+  "n_heads": 24,
+  "n_kv_heads": 8,
+  "head_dim": 128,
+  "rope_theta": 500000,
+  "layer_norm_eps": 1e-6,
+  "init_std": 0.008,
+  "use_qk_norm": true,
+  "use_head_qk_norm": false,
+  "layer_norm_type": "rms_norm",
+  "block_type": "reordered_norm",
+  "attention_backend": "sdpa",
+  "hidden_size_multiple_of": 256,
+  "hidden_size_multiplier": 1.5,
+  "num_mtp_heads": 0,
+  "mtp_loss_weight": 0.1
+}

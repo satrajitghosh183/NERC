@@ -1,0 +1,19 @@
+# Build artifacts
+/build/
+/compile_commands.json
+*.o
+*.a
+*.so
+*.dylib
+
+# Benchmark/eval output is data we DO keep, except scratch
+/data/scratch/
+
+# Vendored heavy artifacts (source is kept; build output is not)
+/external/llm-cpp/build/
+
+# OS
+.DS_Store
+
+# clangd / editor caches
+/.cache/

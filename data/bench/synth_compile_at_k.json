@@ -1,0 +1,8 @@
+{
+  "suite": "synth_compile_at_k",
+  "records": [
+    {"name": "stub_generator", "metric": "compile_at_1", "value": 0.5, "unit": "frac"},
+    {"name": "stub_generator", "metric": "compile_at_k", "value": 1, "unit": "frac"},
+    {"name": "stub_generator", "metric": "mean_attempts", "value": 1.5, "unit": "count"}
+  ]
+}
