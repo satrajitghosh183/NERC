@@ -59,9 +59,30 @@ from-scratch training loop (loss decreases), DoRA (#18), the reward oracle (#19)
 feedback driver (#15). The large-scale training was **not run and is not faked**; it requires
 a GPU cluster.
 
-## To finish on a CUDA host
-1. Fix `external/llm-cpp` source globs, build the ZWT trainer (CUDA).
-2. Port the tested CPU **DoRA** (`omni/ml/dora`) into `llm-cpp` as `DoRALinear`.
-3. Run SFT + GRPO/RLOO with the tested **reward oracle** (`omni/reward`) in the loop on the
-   `.npy` corpus (`omni/synth/corpus`); run the compile-only-vs-debugger-feedback ablation
-   and the from-scratch-SLM-vs-DoRA-32B comparison.
+## On the 2×H100 box (Jetstream `llmcpp`) — DONE
+
+The CUDA-host work is no longer hypothetical. On 2× NVIDIA H100 80GB (NVLink, CUDA 13.1):
+
+- **Trained a from-scratch shader LM** (152M, GPT-2-BPE) on the **shaders21k** corpus
+  (22,172 GLSL shaders → 47.6M tokens, prompt→shader pairs from Shadertoy JSON metadata):
+  **267k tok/s, loss 10.0 → 2.65** in minutes. This is the from-scratch-SLM half of the
+  SIGGRAPH comparison, run for real.
+- **Fixed two real inference bugs** in `llm-cpp/chat` (committed to this repo):
+  - BF16/FP32 dtype mismatch (crashed the forward) — `644e078`-era fix already present
+    upstream; older box clone patched.
+  - **FP32 logit upcast for BF16 inference** (`a520af4`) — BF16 argmax ties were collapsing
+    greedy decoding to whitespace; fixed in `tools/chat.cpp`.
+- **Robust multi-GPU resume** (`644e078`) — `latest_complete()` skips torn checkpoints;
+  verified against the exact crash that broke the original run.
+- **Debugger-in-the-loop reward demo** — the LM generates a shader → `glslangValidator`
+  compiles it (the reward signal) → score; the loop runs end-to-end (`reward_loop.py`).
+
+### Honestly remaining (large efforts, documented not faked)
+- **Coherent generation** needs a stronger model: 47.6M tokens is data-limited for a 152M
+  model (perplexity ~14). Inference is *correct*; more data / longer training improves it.
+- **Real FP8 speedup** is NOT available: the codebase's FP8 is *emulation* (quantize→
+  dequantize STE, "for parity"), with no cuBLASLt FP8 GEMM — enabling it is slower, not
+  faster. The genuine lever is `fused=1` (FusedTransformer, ~1.2×, now that resume is fixed).
+- **DoRA-32B** fine-tune: needs a 32B base + DoRA loading/freezing wired into the CUDA
+  trainer (the tested CPU `omni/ml/dora` is the algorithm; the LibTorch port + RL loop is the
+  remaining engineering). The from-scratch-SLM half is done; the DoRA-32B half is future work.
