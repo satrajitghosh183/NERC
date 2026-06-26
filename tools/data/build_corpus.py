@@ -208,7 +208,9 @@ def build(sources, out, min_len, val_frac):
             code = r["code"]
             if len(code) < min_len:
                 thin += 1; continue
-            if not has_entry(code):
+            # GLSL/Shadertoy needs a GLSL entry point; HLSL/Metal use other conventions
+            # and are already signature-filtered in from_thestack, so don't gate them here.
+            if not r["source"].startswith(("thestack-hlsl", "thestack-metal")) and not has_entry(code):
                 noentry += 1; continue
             sid = r.get("id")
             if sid and sid in seen_id:
