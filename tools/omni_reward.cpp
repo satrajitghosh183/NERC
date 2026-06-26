@@ -234,7 +234,8 @@ int main(int argc, char** argv) {
 
     const reward::Breakdown b = reward::score(in);
 
-    // ---- output: one JSON line -----------------------------------------------------------
+    // ---- output: one JSON line (sanitize non-finite so it stays valid JSON) ---------------
+    const double out_var = std::isfinite(probe.output_var) ? probe.output_var : 0.0;
     std::printf(
         "{\"compiled\":%s,\"lifted\":%s,\"executed\":%s,\"all_finite\":%s,"
         "\"output_variance\":%.6g,\"exec_samples\":%d,\"reward\":%.6f,"
@@ -242,7 +243,7 @@ int main(int argc, char** argv) {
         "\"compile_log\":\"%s\"}\n",
         in.compiled ? "true" : "false", lifted ? "true" : "false",
         in.executed ? "true" : "false", probe.all_finite ? "true" : "false",
-        probe.output_var, probe.samples, b.total,
+        out_var, probe.samples, b.total,
         b.compile, b.exec, b.visual,
         json_escape(cr.log).c_str());
     return 0;

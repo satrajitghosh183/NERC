@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""
+omnishader — a CLI for the OmniTrace shader debugger + the debugger-in-the-loop generator.
+
+  omnishader debug <file.frag>     run OmniTrace on a shader (compile + execute + diagnose)
+  omnishader gen "<prompt>" [-o f] generate a shader (RL-refined DoRA-3B, on the GPU box)
+  omnishader loop "<prompt>"       generate -> debug, the whole pipeline in one shot
+  omnishader eval <dir>            compile@k over a directory of shaders
+
+The debugger (omni_reward) runs LOCALLY — it's the C++ contribution, built from this repo.
+Generation runs on the GPU box over ssh (set OMNISHADER_BOX / OMNISHADER_KEY to point at it).
+"""
+import argparse, json, os, re, subprocess, sys, tempfile
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+OMNI = os.path.join(ROOT, "build", "omni_reward")
+BOX  = os.environ.get("OMNISHADER_BOX", "exouser@149.165.170.212")
+KEY  = os.environ.get("OMNISHADER_KEY", os.path.expanduser("~/.ssh/id_nerc_box"))
+GEN  = os.environ.get("OMNISHADER_GEN", "~/shader_pipeline/gen_one.py")
+
+# ---- ANSI ----------------------------------------------------------------
+class C:
+    g="\033[32m"; r="\033[31m"; y="\033[33m"; b="\033[34m"; c="\033[36m"; d="\033[2m"; bd="\033[1m"; x="\033[0m"
+def ok(s):  return f"{C.g}{s}{C.x}"
+def bad(s): return f"{C.r}{s}{C.x}"
+
+HARNESS = ("#version 450\nlayout(location=0) out vec4 _O;\n"
+           "layout(push_constant) uniform U { vec3 iResolution; float iTime; vec4 iMouse; int iFrame; } u;\n"
+           "#define iResolution u.iResolution\n#define iTime u.iTime\n#define iMouse u.iMouse\n#define iFrame u.iFrame\n")
+
+def wrap(code):
+    """Make a complete fragment shader from a Shadertoy mainImage snippet."""
+    if "void main(" in code and "#version" in code:
+        return code
+    if "mainImage" in code:
+        return HARNESS + code + "\nvoid main(){ vec4 c=vec4(0.); mainImage(c, gl_FragCoord.xy); _O=c; }\n"
+    return HARNESS + "void main(){ vec2 fragCoord=gl_FragCoord.xy; vec2 uv=fragCoord/iResolution.xy; vec3 col=vec3(0.);\n" + code + "\n_O=vec4(col,1.); }\n"
+
+def run_debugger(glsl):
+    if not os.path.exists(OMNI):
+        sys.exit(f"{bad('omni_reward not built')} — run: cmake -S . -B build && cmake --build build --target omni_reward")
+    p = subprocess.run([OMNI], input=glsl, capture_output=True, text=True, errors="replace", timeout=60)
+    return json.loads(p.stdout.strip().splitlines()[-1])
+
+def report(j, title):
+    line = lambda k, v: print(f"  {C.d}{k:<14}{C.x}{v}")
+    print(f"\n{C.bd}╭─ OmniTrace ── {title} {C.x}")
+    line("compile", ok("✓ passed") if j["compiled"] else bad("✗ failed"))
+    if j["compiled"]:
+        line("lift → UIR", ok("✓") if j.get("lifted") else f"{C.y}— (not lifted){C.x}")
+        if j.get("executed"):
+            line("execute", ok(f"✓ ran finite  ({j.get('exec_samples',0)} samples)"))
+        else:
+            why = "NaN/Inf detected" if not j.get("all_finite") else "interpreter could not run it"
+            line("execute", bad(f"✗ {why}"))
+    rew = j.get("reward", 0.0)
+    col = C.g if rew >= 3.0 else (C.y if rew >= 1.0 else C.r)
+    line("reward", f"{col}{C.bd}{rew:.2f}{C.x}  {C.d}(compile {j['breakdown']['compile']:.0f} · exec {j['breakdown']['exec']:.1f} · visual {j['breakdown']['visual']:.1f}){C.x}")
+    if not j["compiled"] and j.get("compile_log"):
+        first = next((l for l in j["compile_log"].splitlines() if "ERROR" in l), "")
+        if first: print(f"  {C.r}{first.strip()[:90]}{C.x}")
+    print(f"{C.bd}╰────────────────────────────────────────────{C.x}")
+    return rew
+
+def generate(prompt, adapter=None):
+    cmd = ["ssh", "-i", KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=20", BOX,
+           f"python3 {GEN} {json.dumps(prompt)}" + (f" '' {adapter}" if adapter else "")]
+    print(f"{C.d}generating on {BOX.split('@')[-1]} (RL-refined DoRA-3B)…{C.x}", file=sys.stderr)
+    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=300)
+    code = "\n".join(l for l in p.stdout.splitlines() if not l.startswith(("Loading", "You:")))
+    if not code.strip():
+        sys.exit(bad(f"generation failed: {p.stderr.strip()[-300:]}"))
+    return code.strip()
+
+# ---- commands ------------------------------------------------------------
+def cmd_debug(a):
+    src = open(a.file, errors="replace").read()
+    report(run_debugger(wrap(src)), os.path.basename(a.file))
+
+def cmd_gen(a):
+    code = generate(a.prompt, a.adapter)
+    if a.out:
+        open(a.out, "w").write(code); print(f"{ok('saved')} → {a.out}")
+    else:
+        print(code)
+
+def cmd_loop(a):
+    code = generate(a.prompt, a.adapter)
+    print(f"\n{C.c}{C.bd}── generated shader ──{C.x}")
+    print(C.d + code[:600] + ("…" if len(code) > 600 else "") + C.x)
+    rew = report(run_debugger(wrap(code)), f'"{a.prompt}"')
+    verdict = ok("it compiles and runs") if rew >= 3.0 else (f"{C.y}compiles but doesn't run clean{C.x}" if rew >= 1.0 else bad("broken"))
+    print(f"\n  {C.bd}verdict:{C.x} {verdict}")
+    if a.out:
+        open(a.out, "w").write(code); print(f"  {C.d}saved → {a.out}{C.x}")
+
+def cmd_eval(a):
+    import glob
+    files = [f for f in glob.glob(os.path.join(a.dir, "*")) if os.path.isfile(f)]
+    n = ok_n = 0
+    for f in files:
+        j = run_debugger(wrap(open(f, errors="replace").read())); n += 1; ok_n += int(j["compiled"])
+    print(f"compile@1 = {ok_n}/{n} = {ok_n/max(n,1):.3f}")
+
+def main():
+    ap = argparse.ArgumentParser(prog="omnishader", description="OmniTrace shader debugger + generator")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    d = sub.add_parser("debug"); d.add_argument("file"); d.set_defaults(fn=cmd_debug)
+    g = sub.add_parser("gen"); g.add_argument("prompt"); g.add_argument("-o", "--out"); g.add_argument("--adapter"); g.set_defaults(fn=cmd_gen)
+    l = sub.add_parser("loop"); l.add_argument("prompt"); l.add_argument("-o", "--out"); l.add_argument("--adapter"); l.set_defaults(fn=cmd_loop)
+    e = sub.add_parser("eval"); e.add_argument("dir"); e.set_defaults(fn=cmd_eval)
+    a = ap.parse_args(); a.fn(a)
+
+if __name__ == "__main__":
+    main()

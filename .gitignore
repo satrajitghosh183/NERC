@@ -17,3 +17,4 @@
 
 # clangd / editor caches
 /.cache/
+trained_models/
