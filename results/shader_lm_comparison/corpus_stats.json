@@ -1,0 +1,14 @@
+{
+  "kept": 33652,
+  "dup": 45811,
+  "thin": 0,
+  "no_entry": 6,
+  "by_source": {
+    "vipitis": 19556,
+    "mizuamedesu": 14096
+  },
+  "train": 32979,
+  "val": 673,
+  "chars": 141989201,
+  "est_gpt2_tokens": 38375460
+}
