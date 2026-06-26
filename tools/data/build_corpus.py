@@ -147,6 +147,27 @@ def from_chat_parquet(path, source="chat_parquet"):
                    "code": code, "source": source, "license": ""}
 
 
+_UNITY = re.compile(r"ShaderLab|UNITY_|#pragma surface|UnityObject")
+
+
+def from_thestack(parquet_glob, source="thestack"):
+    """Yield fragment-style GLSL from The Stack's glsl subset parquet(s). Filters out
+    Unity ShaderLab / vertex / engine noise; keeps mainImage or gl_Frag* shaders.
+    These are general WebGL/GLSL-ES shaders (weak prompts) — good for syntax, tagged
+    so they can be down-weighted vs the Shadertoy data."""
+    import pandas as pd
+    for path in sorted(glob.glob(parquet_glob)):
+        df = pd.read_parquet(path, columns=["content", "max_stars_repo_path"])
+        for code, rp in zip(df["content"].astype(str), df["max_stars_repo_path"].astype(str)):
+            if _UNITY.search(code):
+                continue
+            if "mainImage" not in code and not re.search(r"gl_FragColor|gl_FragCoord", code):
+                continue
+            name = os.path.splitext(os.path.basename(rp))[0][:60] or "untitled"
+            yield {"id": None, "name": name, "desc": "", "tags": [],
+                   "code": code, "source": source, "license": ""}
+
+
 def from_frag_dir(d, source):
     """Yield dicts from a dir of raw shader files (shaders21k codes/, etc.)."""
     for fp in glob.glob(os.path.join(d, "*")):
@@ -221,6 +242,7 @@ def main():
     ap.add_argument("--seanmemery", help="seanmemery/shader_dataset parquet (code+description)")
     ap.add_argument("--chat-parquet", action="append", default=[],
                     help="parquet with chat `messages` (repeatable, e.g. bdhwan)")
+    ap.add_argument("--thestack", help="glob for The Stack glsl parquet(s), e.g. 'thestack/data/glsl/*.parquet'")
     ap.add_argument("--extra", help="extra dir of // Shader: txt")
     ap.add_argument("--out", default="corpus_merged")
     ap.add_argument("--min-len", type=int, default=60)
@@ -234,6 +256,7 @@ def main():
     if args.shaders21k: gens.append(from_frag_dir(args.shaders21k, "shaders21k"))
     if args.seanmemery: gens.append(from_parquet_desc(args.seanmemery, source="seanmemery"))
     for cp in args.chat_parquet: gens.append(from_chat_parquet(cp))
+    if args.thestack:   gens.append(from_thestack(args.thestack))
     if args.extra:      gens.append(from_frag_dir(args.extra, "extra"))
     if not gens:
         sys.exit("ERROR: give at least one of --vipitis/--mizu/--shaders21k/--extra")

@@ -8,10 +8,12 @@ The Shadertoy API turned out to be a dead end: creating an app needs Silver/Gold
 status, and it's capped at 1,500 requests/month — useless for bulk. So the corpus is built
 entirely from already-scraped public datasets:
 
-- **seanmemery/shader_dataset** (HF): 45,209 shaders with descriptions — the big find, almost
-  no overlap with the others (+42,272 net-new).
-- **mizuamedesu/shader-sft-dataset** (HF): 56,854 chat-format shaders.
-- **Vipitis/shadertoys-dataset** (GitHub, `data/annotated/`): 19,622 shaders w/ metadata.
+- **seanmemery/shader_dataset** (HF): 45,209 shaders with descriptions (+42,272 net-new).
+- **The Stack** glsl subset (`bigcode/the-stack-dedup`, gated — HF token): 175,576 raw GitHub
+  `.glsl/.shader` files, filtered to fragment-style (`mainImage` or `gl_Frag*`, dropping Unity
+  ShaderLab / vertex / engine noise) → +34,829.
+- **mizuamedesu/shader-sft-dataset** (HF): 56,854 chat-format shaders (+14,096 after dedup).
+- **Vipitis/shadertoys-dataset** (GitHub): 19,622 shaders w/ metadata (+19,556).
 
 `build_corpus.py` normalizes all of them into the `// Shader: <name>` instruction format (the
 format the eval prompts use — fixing the mismatch that gave the from-scratch model 0/8) and
@@ -19,13 +21,17 @@ dedupes by Shadertoy id + normalized-code SHA1:
 
 | | count |
 |---|---|
-| **unique shaders** | **75,924** (seanmemery 42,272 · vipitis 19,556 · mizuamedesu 14,096) |
-| duplicates removed | 48,729 (mizuamedesu & vipitis heavily overlap — both scrape Shadertoy) |
-| size | 257M chars / **~128M GPT-2 tokens** (≈2.7× the old run's 47.6M) |
+| **unique shaders** | **110,753** (seanmemery 42,272 · the-stack 34,829 · vipitis 19,556 · mizuamedesu 14,096) |
+| duplicates removed | 49,009 (Shadertoy sources overlap heavily; The Stack is GitHub, so less) |
+| size | 342M chars / **~170M GPT-2 tokens** (≈5× the old run's 22k shaders / 47.6M tokens) |
 
-> The next lever is **The Stack**'s GLSL subset (`bigcode/the-stack-dedup`, `data/glsl/`), which
-> is gated — it needs the HF account to accept the dataset terms + a token. That could add
-> tens of thousands more GLSL files from GitHub.
+> Note on The Stack: those 34,829 are general WebGL/GLSL-ES fragment shaders (gl_FragColor style),
+> a different flavor from Shadertoy's `mainImage`/`iResolution` convention. Good for teaching GLSL
+> syntax, tagged by source so they can be down-weighted vs the Shadertoy data if the eval (which is
+> Shadertoy-style) calls for it.
+>
+> The Shadertoy API was abandoned: app creation needs Silver/Gold profile status, and it's capped at
+> 1,500 requests/month — useless for bulk.
 
 ## GLSL tokenizer — measured win
 `train_bpe.py` is a from-scratch byte-level BPE (GPT-2-compatible `vocab.json`/`merges.txt`, so

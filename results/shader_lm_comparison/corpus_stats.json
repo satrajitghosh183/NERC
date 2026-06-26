@@ -1,15 +1,17 @@
 {
-  "kept": 75924,
-  "dup": 48729,
-  "thin": 18,
-  "no_entry": 7,
+  "kept": 110753,
+  "dup": 49009,
+  "thin": 97,
+  "no_entry": 1736,
   "by_source": {
+    "seanmemery": 42272,
+    "thestack": 34829,
     "vipitis": 19556,
-    "mizuamedesu": 14096,
-    "seanmemery": 42272
+    "mizuamedesu": 14096
   },
-  "train": 74406,
-  "val": 1518,
-  "chars": 256804827,
-  "est_gpt2_tokens": 69406710
+  "train": 108538,
+  "val": 2215,
+  "chars": 341532018,
+  "est_gpt2_tokens": 92305951,
+  "note": "v3 corpus, assembled on the box. The Stack glsl subset filtered to fragment-style (mainImage or gl_Frag*, non-Unity). ~170M real GPT-2 tokens (~2 chars/tok measured); ~5x the original 22k-shader / 47.6M-token run."
 }
