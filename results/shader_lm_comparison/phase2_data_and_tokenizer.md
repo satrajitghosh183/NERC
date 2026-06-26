@@ -21,9 +21,16 @@ dedupes by Shadertoy id + normalized-code SHA1:
 
 | | count |
 |---|---|
-| **unique shaders** | **110,753** (seanmemery 42,272 · the-stack 34,829 · vipitis 19,556 · mizuamedesu 14,096) |
-| duplicates removed | 49,009 (Shadertoy sources overlap heavily; The Stack is GitHub, so less) |
-| size | 342M chars / **~170M GPT-2 tokens** (≈5× the old run's 22k shaders / 47.6M tokens) |
+| **unique shaders** | **196,418** (the-stack-glsl 117,361 · seanmemery 42,272 · vipitis 19,556 · mizuamedesu 14,096 · hlsl/metal 3,133) |
+| duplicates removed | 49,723 |
+| size | 467M chars / **~230M GPT-2 tokens** (≈9× the old run's 22k shaders / 47.6M tokens) |
+
+This is roughly the ceiling of *public shader code*. Worth stating plainly: a 3.6B model wants ~70B
+tokens to be Chinchilla-optimal, and the entire shader-code universe is ~hundreds of millions of tokens
+— ~150× short. You cannot from-scratch a large shader model into being best-in-class, because the data
+doesn't exist. That's the paper's point, not a failure: when data is scarce, you borrow a pretrained code
+model's knowledge (DoRA) and refine with the debugger reward (RL). The bigger corpus still helps every
+arm; it just isn't a substitute for the pretrained base.
 
 > Note on The Stack: those 34,829 are general WebGL/GLSL-ES fragment shaders (gl_FragColor style),
 > a different flavor from Shadertoy's `mainImage`/`iResolution` convention. Good for teaching GLSL

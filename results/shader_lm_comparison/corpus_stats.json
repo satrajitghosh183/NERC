@@ -1,17 +1,19 @@
 {
-  "kept": 110753,
-  "dup": 49009,
-  "thin": 97,
-  "no_entry": 1736,
+  "kept": 196418,
+  "dup": 49723,
+  "thin": 18,
+  "no_entry": 41027,
   "by_source": {
+    "thestack-glsl": 117361,
     "seanmemery": 42272,
-    "thestack": 34829,
     "vipitis": 19556,
-    "mizuamedesu": 14096
+    "mizuamedesu": 14096,
+    "thestack-hlsl": 3092,
+    "thestack-metal": 41
   },
-  "train": 108538,
-  "val": 2215,
-  "chars": 341532018,
-  "est_gpt2_tokens": 92305951,
-  "note": "v3 corpus, assembled on the box. The Stack glsl subset filtered to fragment-style (mainImage or gl_Frag*, non-Unity). ~170M real GPT-2 tokens (~2 chars/tok measured); ~5x the original 22k-shader / 47.6M-token run."
+  "train": 192490,
+  "val": 3928,
+  "chars": 466941838,
+  "est_gpt2_tokens": 126200497,
+  "note": "v4 corpus (box). The Stack glsl broadened from fragment-only to all real GLSL (117,361). HLSL/Metal mostly filtered by the entry-point gate (different conventions). 196,418 unique shaders / ~230M real GPT-2 tokens (~2 chars/tok) / ~187M with the GLSL tokenizer. ~9x the original 22k-shader / 47.6M-token run. This is roughly the ceiling of public shader code; a 3.6B model still wants ~70B tokens (Chinchilla), which is why the DoRA-on-a-pretrained-base + debugger-RL path is the headline, not a from-scratch giant."
 }
