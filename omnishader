@@ -77,14 +77,23 @@ def report(j, title):
     print(f"{C.bd}╰────────────────────────────────────────────{C.x}")
     return rew
 
-def generate(prompt, adapter=None):
-    cmd = ["ssh", "-i", KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=20", BOX,
-           f"python3 {GEN} {json.dumps(prompt)}" + (f" '' {adapter}" if adapter else "")]
-    print(f"{C.d}generating on {BOX.split('@')[-1]} (RL-refined DoRA-3B)…{C.x}", file=sys.stderr)
-    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=300)
+def generate(prompt, adapter=None, backend="local"):
+    if backend == "local":
+        gl = os.path.join(ROOT, "tools", "cli", "gen_local.py")
+        base = os.path.join(ROOT, "trained_models", "base_qwen3b")
+        if not os.path.isdir(base):
+            sys.exit(bad("local base model not downloaded yet — trained_models/base_qwen3b "
+                         "(it downloads in the background) or use --backend box"))
+        print(f"{C.d}generating locally — RL-refined DoRA-3B on MPS (first run loads the model)…{C.x}", file=sys.stderr)
+        cmd = ["python3", gl, prompt, "", adapter or ""]
+    else:
+        print(f"{C.d}generating on {BOX.split('@')[-1]} (RL-refined DoRA-3B)…{C.x}", file=sys.stderr)
+        cmd = ["ssh", "-i", KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=20", BOX,
+               f"python3 {GEN} {json.dumps(prompt)}" + (f" '' {adapter}" if adapter else "")]
+    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=600)
     code = "\n".join(l for l in p.stdout.splitlines() if not l.startswith(("Loading", "You:")))
     if not code.strip():
-        sys.exit(bad(f"generation failed: {p.stderr.strip()[-300:]}"))
+        sys.exit(bad(f"generation failed: {(p.stderr or p.stdout).strip()[-300:]}"))
     return code.strip()
 
 def to_mainimage(code):
@@ -106,14 +115,14 @@ def cmd_render(a):
     render(to_mainimage(src), size=a.size, t=a.time)
 
 def cmd_gen(a):
-    code = generate(a.prompt, a.adapter)
+    code = generate(a.prompt, a.adapter, a.backend)
     if a.out:
         open(a.out, "w").write(code); print(f"{ok('saved')} → {a.out}")
     else:
         print(code)
 
 def cmd_loop(a):
-    code = generate(a.prompt, a.adapter)
+    code = generate(a.prompt, a.adapter, a.backend)
     print(f"\n{C.c}{C.bd}── generated shader ──{C.x}")
     print(C.d + code[:600] + ("…" if len(code) > 600 else "") + C.x)
     rew = report(run_debugger(wrap(code)), f'"{a.prompt}"')
@@ -137,8 +146,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("debug"); d.add_argument("file"); d.add_argument("--no-render", action="store_true"); d.add_argument("--time", type=float, default=1.5); d.set_defaults(fn=cmd_debug)
     rn = sub.add_parser("render"); rn.add_argument("file"); rn.add_argument("--size", type=int, default=512); rn.add_argument("--time", type=float, default=1.5); rn.set_defaults(fn=cmd_render)
-    g = sub.add_parser("gen"); g.add_argument("prompt"); g.add_argument("-o", "--out"); g.add_argument("--adapter"); g.set_defaults(fn=cmd_gen)
-    l = sub.add_parser("loop"); l.add_argument("prompt"); l.add_argument("-o", "--out"); l.add_argument("--adapter"); l.add_argument("--no-render", action="store_true"); l.add_argument("--time", type=float, default=1.5); l.set_defaults(fn=cmd_loop)
+    g = sub.add_parser("gen"); g.add_argument("prompt"); g.add_argument("-o", "--out"); g.add_argument("--adapter"); g.add_argument("--backend", choices=["local", "box"], default="local"); g.set_defaults(fn=cmd_gen)
+    l = sub.add_parser("loop"); l.add_argument("prompt"); l.add_argument("-o", "--out"); l.add_argument("--adapter"); l.add_argument("--backend", choices=["local", "box"], default="local"); l.add_argument("--no-render", action="store_true"); l.add_argument("--time", type=float, default=1.5); l.set_defaults(fn=cmd_loop)
     e = sub.add_parser("eval"); e.add_argument("dir"); e.set_defaults(fn=cmd_eval)
     a = ap.parse_args(); a.fn(a)
 
