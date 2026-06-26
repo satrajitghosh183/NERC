@@ -1,14 +1,15 @@
 {
-  "kept": 33652,
-  "dup": 45811,
-  "thin": 0,
-  "no_entry": 6,
+  "kept": 75924,
+  "dup": 48729,
+  "thin": 18,
+  "no_entry": 7,
   "by_source": {
     "vipitis": 19556,
-    "mizuamedesu": 14096
+    "mizuamedesu": 14096,
+    "seanmemery": 42272
   },
-  "train": 32979,
-  "val": 673,
-  "chars": 141989201,
-  "est_gpt2_tokens": 38375460
+  "train": 74406,
+  "val": 1518,
+  "chars": 256804827,
+  "est_gpt2_tokens": 69406710
 }

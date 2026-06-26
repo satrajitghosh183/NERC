@@ -116,6 +116,37 @@ def from_mizu(fp):
                "code": code, "source": "mizuamedesu", "license": ""}
 
 
+def from_parquet_desc(path, code_col="code", desc_col="description", source="parquet"):
+    """Yield from a parquet with a code column + a free-text description column
+    (e.g. seanmemery/shader_dataset: description/code/text)."""
+    import pandas as pd
+    df = pd.read_parquet(path)
+    for _, r in df.iterrows():
+        code = str(r.get(code_col, "") or "").strip()
+        if not code:
+            continue
+        desc = str(r.get(desc_col, "") or "").strip()
+        name = (re.split(r"[.\n]", desc)[0][:60].strip() if desc else "") or "untitled"
+        yield {"id": None, "name": name, "desc": desc, "tags": [],
+               "code": code, "source": source, "license": ""}
+
+
+def from_chat_parquet(path, source="chat_parquet"):
+    """Yield from a parquet whose rows hold chat `messages` (assistant carries a
+    ```glsl fence); best-effort over nested/array content (e.g. bdhwan)."""
+    import pandas as pd
+    df = pd.read_parquet(path)
+    for _, r in df.iterrows():
+        blob = json.dumps(r.get("messages", ""), default=str)
+        m = CODE_FENCE.search(blob.replace("\\n", "\n"))
+        if not m:
+            continue
+        code = m.group(1).strip()
+        if code:
+            yield {"id": None, "name": "untitled", "desc": "", "tags": [],
+                   "code": code, "source": source, "license": ""}
+
+
 def from_frag_dir(d, source):
     """Yield dicts from a dir of raw shader files (shaders21k codes/, etc.)."""
     for fp in glob.glob(os.path.join(d, "*")):
@@ -187,6 +218,9 @@ def main():
     ap.add_argument("--mizu", help="mizuamedesu train jsonl")
     ap.add_argument("--mizu-eval", help="mizuamedesu eval jsonl (folded into corpus too)")
     ap.add_argument("--shaders21k", help="shaders21k codes/ dir (on box)")
+    ap.add_argument("--seanmemery", help="seanmemery/shader_dataset parquet (code+description)")
+    ap.add_argument("--chat-parquet", action="append", default=[],
+                    help="parquet with chat `messages` (repeatable, e.g. bdhwan)")
     ap.add_argument("--extra", help="extra dir of // Shader: txt")
     ap.add_argument("--out", default="corpus_merged")
     ap.add_argument("--min-len", type=int, default=60)
@@ -198,6 +232,8 @@ def main():
     if args.mizu:       gens.append(from_mizu(args.mizu))
     if args.mizu_eval:  gens.append(from_mizu(args.mizu_eval))
     if args.shaders21k: gens.append(from_frag_dir(args.shaders21k, "shaders21k"))
+    if args.seanmemery: gens.append(from_parquet_desc(args.seanmemery, source="seanmemery"))
+    for cp in args.chat_parquet: gens.append(from_chat_parquet(cp))
     if args.extra:      gens.append(from_frag_dir(args.extra, "extra"))
     if not gens:
         sys.exit("ERROR: give at least one of --vipitis/--mizu/--shaders21k/--extra")

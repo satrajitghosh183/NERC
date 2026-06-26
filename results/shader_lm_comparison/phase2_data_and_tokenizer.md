@@ -3,24 +3,29 @@
 Done entirely on the laptop while the H100 box is off. Everything below is measured, not
 assumed. Tooling: `tools/data/`, `tools/eval/`, `tools/rl/` (all have `--self-test`, all pass).
 
-## Corpus — merged & deduped (key-free)
-Pulled two already-scraped corpora (no Shadertoy API key needed):
+## Corpus — merged & deduped (key-free, no Shadertoy API)
+The Shadertoy API turned out to be a dead end: creating an app needs Silver/Gold profile
+status, and it's capped at 1,500 requests/month — useless for bulk. So the corpus is built
+entirely from already-scraped public datasets:
+
+- **seanmemery/shader_dataset** (HF): 45,209 shaders with descriptions — the big find, almost
+  no overlap with the others (+42,272 net-new).
 - **mizuamedesu/shader-sft-dataset** (HF): 56,854 chat-format shaders.
-- **Vipitis/shadertoys-dataset** (GitHub, `data/annotated/`): 19,622 shaders w/ rich metadata.
+- **Vipitis/shadertoys-dataset** (GitHub, `data/annotated/`): 19,622 shaders w/ metadata.
 
-`build_corpus.py` normalizes both into the `// Shader: <name>` instruction format (the format
-the eval prompts use — fixing the mismatch that gave the from-scratch model 0/8) and dedupes by
-Shadertoy id + normalized-code SHA1:
+`build_corpus.py` normalizes all of them into the `// Shader: <name>` instruction format (the
+format the eval prompts use — fixing the mismatch that gave the from-scratch model 0/8) and
+dedupes by Shadertoy id + normalized-code SHA1:
 
-| | raw | after dedup |
-|---|---|---|
-| records | ~79,500 | **33,652 unique** |
-| duplicates removed | — | 45,811 (the two sources heavily overlap — both scrape Shadertoy) |
-| GPT-2 tokens (measured) | — | **~70.5M** (vs the old run's 47.6M → ~1.5×) |
+| | count |
+|---|---|
+| **unique shaders** | **75,924** (seanmemery 42,272 · vipitis 19,556 · mizuamedesu 14,096) |
+| duplicates removed | 48,729 (mizuamedesu & vipitis heavily overlap — both scrape Shadertoy) |
+| size | 257M chars / **~128M GPT-2 tokens** (≈2.7× the old run's 47.6M) |
 
-> Honest note: dedup was larger than hoped — the two corpora are mostly the same shaders. The
-> Shadertoy **API** (needs the user's key) remains the real lever for *net-new* shaders, plus
-> shaders21k on the box (another dedupe pass). Union with shaders21k est. ~40–50k unique.
+> The next lever is **The Stack**'s GLSL subset (`bigcode/the-stack-dedup`, `data/glsl/`), which
+> is gated — it needs the HF account to accept the dataset terms + a token. That could add
+> tens of thousands more GLSL files from GitHub.
 
 ## GLSL tokenizer — measured win
 `train_bpe.py` is a from-scratch byte-level BPE (GPT-2-compatible `vocab.json`/`merges.txt`, so
