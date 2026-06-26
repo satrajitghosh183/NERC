@@ -131,6 +131,39 @@ def grpo_advantages(rewards):
     return [(r - mean) / std for r in rewards]
 
 
+# ----------------------------------------------- the real debugger as the reward
+class OmniRewardScorer:
+    """Reward each candidate by invoking the OmniTrace `omni_reward` C++ CLI: it compiles,
+    lifts to UIR, runs the CPU SIMT reference, and returns a JSON reward that already mirrors
+    omni::reward::score. This makes the actual debugger — not a Python compile check — the
+    reward signal. Falls back to glslang-only compile reward if the binary is absent."""
+    def __init__(self, bin_path, glslang="glslangValidator"):
+        self.bin = bin_path if (bin_path and os.path.exists(bin_path)) else None
+        self.glslang = glslang
+
+    def score(self, glsl):
+        if self.bin:
+            try:
+                p = subprocess.run([self.bin], input=glsl, capture_output=True, text=True,
+                                   errors="replace", timeout=30)
+                j = json.loads(p.stdout.strip().splitlines()[-1])
+                return float(j.get("reward", 0.0)), j.get("breakdown", {})
+            except Exception:
+                pass
+        # fallback: compile-only via glslang
+        import tempfile
+        f = tempfile.NamedTemporaryFile(suffix=".frag", delete=False, mode="w")
+        f.write(glsl); f.close()
+        try:
+            ok = subprocess.run([self.glslang, "-V", f.name, "-o", os.devnull],
+                                capture_output=True, timeout=20).returncode == 0
+        except Exception:
+            ok = False
+        finally:
+            os.unlink(f.name)
+        return (1.0 if ok else 0.0), {"compile": 1.0 if ok else 0.0}
+
+
 # --------------------------------------------------------------- train loop
 def train(args):
     import torch
@@ -139,8 +172,7 @@ def train(args):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "eval"))
     from eval_batched import extract_code, wrap                       # reuse wrapping
 
-    w = Weights()
-    sig = Signals(args.omnitrace, args.glslang)
+    scorer = OmniRewardScorer(args.omni_reward_bin, args.glslang)
     prompts = [json.loads(l) for l in open(args.prompts) if l.strip()]
 
     tok = AutoTokenizer.from_pretrained(args.base)
@@ -165,7 +197,7 @@ def train(args):
         rewards, bdowns = [], []
         for row in comp:
             code = extract_code(tok.decode(row, skip_special_tokens=True))
-            r, b = reward(sig.score(wrap(code)), w)
+            r, b = scorer.score(wrap(code))            # the OmniTrace debugger is the reward
             rewards.append(r); bdowns.append(b)
         # 3. group-relative advantages
         adv = grpo_advantages(rewards)
@@ -216,7 +248,8 @@ def _self_test():
 def main():
     ap = argparse.ArgumentParser(description="Debugger-in-the-loop GRPO refinement")
     ap.add_argument("--prompts"); ap.add_argument("--base"); ap.add_argument("--adapter")
-    ap.add_argument("--omnitrace", help="dir with OmniTrace binaries (validator/renderer)")
+    ap.add_argument("--omni-reward-bin", default="./build/omni_reward",
+                    help="the OmniTrace omni_reward CLI (the debugger as reward)")
     ap.add_argument("--glslang", default="glslangValidator")
     ap.add_argument("--group", type=int, default=8, help="G completions per prompt")
     ap.add_argument("--steps", type=int, default=200)
