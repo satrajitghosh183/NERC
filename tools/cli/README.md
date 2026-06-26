@@ -1,16 +1,19 @@
-# omnishader — CLI for the OmniTrace debugger + generator
+# omnishader — local CLI for the OmniTrace debugger + generator
 
 ```bash
-./omnishader debug <shader.frag>      # run the OmniTrace debugger on a shader (local, C++)
-./omnishader gen   "<prompt>" -o f    # generate a shader (RL-refined DoRA-3B, on the GPU box)
-./omnishader loop  "<prompt>"         # generate -> debug, the whole pipeline
-./omnishader eval  <dir>              # compile@1 over a directory of shaders
+./omnishader debug  <shader.frag>     # debug a shader AND render it (local GPU/MoltenVK)
+./omnishader render <shader.frag>     # just render it to an image and open it
+./omnishader loop   "<prompt>"        # generate -> debug -> render, the whole pipeline
+./omnishader gen    "<prompt>" -o f   # just generate
+./omnishader eval   <dir>             # compile@1 over a directory of shaders
 ```
 
-- **debug** runs locally — `omni_reward` (built from `tools/omni_reward.cpp`) compiles the shader,
-  lifts SPIR-V to UIR, runs it on the CPU SIMT reference, and reports compile / execute / reward.
-  It catches shaders that compile but produce NaN/Inf when run — what a compile check misses.
-- **gen / loop** generate on the GPU box (`tools/cli/gen_one.py`, the RL-refined DoRA-3B) over ssh.
-  Point at your box with `OMNISHADER_BOX=user@ip OMNISHADER_KEY=~/.ssh/key` (IP changes on unshelve).
+Everything runs **locally** on your machine:
+- **omni_reward** (`tools/omni_reward.cpp`) — compiles, lifts SPIR-V → UIR, runs the shader on the
+  CPU reference, reports compile/execute/reward. Catches shaders that compile but NaN when run.
+- **omni_render** (`tools/omni_render.cpp`) — renders a `mainImage` shader on the real GPU
+  (Vulkan/MoltenVK), reads back the image, writes a PNG and opens it.
+- Build once: `cmake -S . -B build && cmake --build build`
 
-Build the debugger once: `cmake -S . -B build && cmake --build build --target omni_reward`
+Generation backends: local `llm-cpp` chat (your from-scratch model, set via flags) or the GPU box
+(`OMNISHADER_BOX=user@ip` for the RL-refined DoRA-3B). The debugger + renderer are always local.

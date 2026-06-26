@@ -14,6 +14,7 @@ import argparse, json, os, re, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 OMNI = os.path.join(ROOT, "build", "omni_reward")
+RENDER = os.path.join(ROOT, "build", "omni_render")
 BOX  = os.environ.get("OMNISHADER_BOX", "exouser@149.165.170.212")
 KEY  = os.environ.get("OMNISHADER_KEY", os.path.expanduser("~/.ssh/id_nerc_box"))
 GEN  = os.environ.get("OMNISHADER_GEN", "~/shader_pipeline/gen_one.py")
@@ -41,6 +42,20 @@ def run_debugger(glsl):
         sys.exit(f"{bad('omni_reward not built')} — run: cmake -S . -B build && cmake --build build --target omni_reward")
     p = subprocess.run([OMNI], input=glsl, capture_output=True, text=True, errors="replace", timeout=60)
     return json.loads(p.stdout.strip().splitlines()[-1])
+
+def render(code, size=512, t=1.5, show=True):
+    """Render a mainImage shader to a PNG on the local GPU (MoltenVK) and open it."""
+    if not os.path.exists(RENDER):
+        print(f"  {C.y}(omni_render not built — cmake --build build --target omni_render){C.x}"); return None
+    f = tempfile.NamedTemporaryFile(suffix=".frag", delete=False, mode="w"); f.write(code); f.close()
+    ppm = f.name + ".ppm"; png = f.name + ".png"
+    r = subprocess.run([RENDER, f.name, ppm, str(size), str(size), str(t)], capture_output=True, text=True, timeout=60)
+    if r.returncode != 0 or not os.path.exists(ppm):
+        print(f"  {C.y}render: {r.stdout.strip() or r.stderr.strip()}{C.x}"); return None
+    subprocess.run(["sips", "-s", "format", "png", ppm, "--out", png], capture_output=True)
+    print(f"  {C.c}rendered → {png}{C.x}  {C.d}({r.stdout.strip()}){C.x}")
+    if show: subprocess.run(["open", png])
+    return png
 
 def report(j, title):
     line = lambda k, v: print(f"  {C.d}{k:<14}{C.x}{v}")
@@ -72,10 +87,23 @@ def generate(prompt, adapter=None):
         sys.exit(bad(f"generation failed: {p.stderr.strip()[-300:]}"))
     return code.strip()
 
+def to_mainimage(code):
+    """Strip a wrapping harness so omni_render gets a clean mainImage + helpers."""
+    drop = ("#version", "layout(", "uniform ", "#define iResolution", "#define iTime",
+            "#define iMouse", "#define iFrame", "#define iTimeDelta")
+    keep = [ln for ln in code.splitlines() if not ln.strip().startswith(drop) and "push_constant" not in ln]
+    return "\n".join(keep)
+
 # ---- commands ------------------------------------------------------------
 def cmd_debug(a):
     src = open(a.file, errors="replace").read()
-    report(run_debugger(wrap(src)), os.path.basename(a.file))
+    j = report(run_debugger(wrap(src)), os.path.basename(a.file))
+    if j and not a.no_render:
+        render(to_mainimage(src), t=a.time)
+
+def cmd_render(a):
+    src = open(a.file, errors="replace").read()
+    render(to_mainimage(src), size=a.size, t=a.time)
 
 def cmd_gen(a):
     code = generate(a.prompt, a.adapter)
@@ -91,6 +119,8 @@ def cmd_loop(a):
     rew = report(run_debugger(wrap(code)), f'"{a.prompt}"')
     verdict = ok("it compiles and runs") if rew >= 3.0 else (f"{C.y}compiles but doesn't run clean{C.x}" if rew >= 1.0 else bad("broken"))
     print(f"\n  {C.bd}verdict:{C.x} {verdict}")
+    if rew >= 1.0 and not a.no_render:
+        render(code, t=a.time)
     if a.out:
         open(a.out, "w").write(code); print(f"  {C.d}saved → {a.out}{C.x}")
 
@@ -105,9 +135,10 @@ def cmd_eval(a):
 def main():
     ap = argparse.ArgumentParser(prog="omnishader", description="OmniTrace shader debugger + generator")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    d = sub.add_parser("debug"); d.add_argument("file"); d.set_defaults(fn=cmd_debug)
+    d = sub.add_parser("debug"); d.add_argument("file"); d.add_argument("--no-render", action="store_true"); d.add_argument("--time", type=float, default=1.5); d.set_defaults(fn=cmd_debug)
+    rn = sub.add_parser("render"); rn.add_argument("file"); rn.add_argument("--size", type=int, default=512); rn.add_argument("--time", type=float, default=1.5); rn.set_defaults(fn=cmd_render)
     g = sub.add_parser("gen"); g.add_argument("prompt"); g.add_argument("-o", "--out"); g.add_argument("--adapter"); g.set_defaults(fn=cmd_gen)
-    l = sub.add_parser("loop"); l.add_argument("prompt"); l.add_argument("-o", "--out"); l.add_argument("--adapter"); l.set_defaults(fn=cmd_loop)
+    l = sub.add_parser("loop"); l.add_argument("prompt"); l.add_argument("-o", "--out"); l.add_argument("--adapter"); l.add_argument("--no-render", action="store_true"); l.add_argument("--time", type=float, default=1.5); l.set_defaults(fn=cmd_loop)
     e = sub.add_parser("eval"); e.add_argument("dir"); e.set_defaults(fn=cmd_eval)
     a = ap.parse_args(); a.fn(a)
 
