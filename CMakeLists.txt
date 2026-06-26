@@ -67,5 +67,14 @@ foreach(b ${OMNI_BENCH})
   target_link_libraries(${bname} PRIVATE omni_core)
 endforeach()
 
+# ---- Tools (CLIs) -----------------------------------------------------------
+# The debugger-in-the-loop reward CLI: compile -> lift -> CPU-reference exec -> reward JSON.
+file(GLOB OMNI_TOOLS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/*.cpp)
+foreach(t ${OMNI_TOOLS})
+  get_filename_component(tname ${t} NAME_WE)
+  add_executable(${tname} ${t})
+  target_link_libraries(${tname} PRIVATE omni_core)
+endforeach()
+
 message(STATUS "omni: ${CMAKE_BUILD_TYPE} build, C++${CMAKE_CXX_STANDARD}, "
         "tests=${OMNI_TESTS}")
